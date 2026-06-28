@@ -4,7 +4,27 @@ updates:
     directory: "/"
     schedule:
       interval: weekly
+    groups:
+      python-dependencies:
+        patterns:
+          - "*"
+
   - package-ecosystem: npm
     directory: "/hestia/interfaces/pythia"
     schedule:
       interval: weekly
+    groups:
+      pythia-dependencies:
+        patterns:
+          - "*"
+    ignore:
+      # Vite 8+ requires Node >=22.12; defer until CI/dev environments upgrade
+      - dependency-name: "vite"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@vitejs/plugin-react"
+        update-types: ["version-update:semver-major"]
+      # Keep React 18 until a coordinated React 19 migration
+      - dependency-name: "react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react-dom"
+        update-types: ["version-update:semver-major"]
