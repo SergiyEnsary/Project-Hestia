@@ -13,6 +13,38 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: gitleaks/gitleaks-action@v2
+
+      - name: Install gitleaks
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_VERSION: 8.24.2
+        run: |
+          curl -sSL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
+            | tar xz -C /usr/local/bin gitleaks
+
+      - name: Run gitleaks
+        run: |
+          set -euo pipefail
+          ARGS=(
+            detect
+            --redact
+            --verbose
+            --report-format sarif
+            --report-path results.sarif
+          )
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE="${{ github.event.pull_request.base.sha }}"
+            HEAD="${{ github.event.pull_request.head.sha }}"
+            # base..head (no caret) — gitleaks-action uses first_commit^..head, which
+            # fails when the first PR commit is a root commit (no parent SHA).
+            gitleaks "${ARGS[@]}" --log-opts="${BASE}..${HEAD}"
+          else
+            gitleaks "${ARGS[@]}"
+          fi
+
+      - name: Upload SARIF artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gitleaks-results.sarif
+          path: results.sarif
+          if-no-files-found: ignore
