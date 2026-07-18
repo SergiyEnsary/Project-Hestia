@@ -1,0 +1,48 @@
+llm:
+  provider: ollama
+  base_url: http://127.0.0.1:11434
+  model: llama3.1:8b
+  timeout_seconds: 120
+
+modules:
+  zephyrus:
+    enabled: true
+    default_location: "San Francisco"
+    units: metric
+  kairos:
+    enabled: false
+    source: ical
+    ical_url: ${CALENDAR_ICAL_URL}
+
+interfaces:
+  pythia:
+    enabled: true
+  echo:
+    enabled: false
+
+security:
+  require_auth: true
+  rate_limit_per_minute: 30
+  max_message_length: 4000
+  max_tool_iterations: 10
+  allowed_origins:
+    - http://localhost:5173
+    - http://127.0.0.1:5173
+    - http://localhost:8000
+    - http://127.0.0.1:8000
+
+aws:
+  enabled: false
+  region: us-east-1
+  secrets_provider: env
+  backup:
+    enabled: false
+    s3_bucket: hestia-backups
+  llm_fallback:
+    enabled: false
+    provider: bedrock
+    model: anthropic.claude-3-haiku-20240307-v1:0
+
+server:
+  host: 127.0.0.1
+  port: 8000

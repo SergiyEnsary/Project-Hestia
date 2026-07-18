@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hestia"
+version = "0.1.0"
+description = "Local-first home assistant AI with modular Greek-named capabilities"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.138.1",
+    "uvicorn[standard]>=0.32.0",
+    "httpx>=0.27.0",
+    "pydantic>=2.9.0",
+    "pydantic-settings>=2.14.2",
+    "python-dotenv>=1.0.0",
+    "pyyaml>=6.0.3",
+    "slowapi>=0.1.10",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=9.1.1",
+    "pytest-asyncio>=0.24.0",
+]
+
+[project.scripts]
+hestia = "hestia.main:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["hestia*"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
