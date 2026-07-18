@@ -48,7 +48,7 @@ You should get a JSON response listing models. If this fails, Hestia cannot chat
 ### Setup
 
 ```bash
-cd "/Users/sergiyensary/Desktop/Code/Project Hestia"
+cd "Project Hestia"
 
 # Create and activate the virtual environment (required before hestia works)
 python3 -m venv .venv
