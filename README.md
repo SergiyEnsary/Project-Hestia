@@ -1,5 +1,7 @@
 # Hestia
 
+[![Coverage Status](https://coveralls.io/repos/github/SergiyEnsary/Project-Hestia/badge.svg?branch=main)](https://coveralls.io/github/SergiyEnsary/Project-Hestia?branch=main)
+
 **Hestia** is a local-first home assistant AI. She runs on your home server with [Ollama](https://ollama.com), delegates to Greek-named capability modules, and is consulted through **Pythia** (web chat).
 
 **Repository:** [github.com/SergiyEnsary/Project-Hestia](https://github.com/SergiyEnsary/Project-Hestia)
@@ -90,8 +92,15 @@ Open Pythia, enter your `HESTIA_API_TOKEN` in settings, and chat with Hestia.
 
 ```bash
 source .venv/bin/activate
-pytest tests/ -v
+pytest tests/ -v --cov=hestia --cov-report=term-missing
+
+cd hestia/interfaces/pythia
+npm run test:coverage
 ```
+
+GitHub Actions publishes backend and frontend coverage in the workflow summary
+and attaches the full reports to each run. Coveralls combines both reports for
+the coverage badge at the top of this page.
 
 ### Production
 
