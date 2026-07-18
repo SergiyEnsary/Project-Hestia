@@ -7,6 +7,6 @@ class OllamaUnavailableError(Exception):
     def __init__(self, base_url: str) -> None:
         self.base_url = base_url
         super().__init__(
-            f"Cannot connect to Ollama at {base_url}. "
+            "Cannot connect to Ollama. "
             "Install Ollama from https://ollama.com, start it, then run: ollama pull llama3.1:8b"
         )
