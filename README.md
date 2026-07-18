@@ -7,6 +7,9 @@
 **Repository:** [github.com/SergiyEnsary/Project-Hestia](https://github.com/SergiyEnsary/Project-Hestia)
 
 See the full architecture plan in [docs/PLAN.md](docs/PLAN.md).
+Security boundaries and module acceptance rules are defined in
+[docs/SECURITY_ARCHITECTURE.md](docs/SECURITY_ARCHITECTURE.md) and
+[docs/MODULE_AUTHORING.md](docs/MODULE_AUTHORING.md).
 
 ## Pantheon
 
@@ -25,7 +28,7 @@ See the full architecture plan in [docs/PLAN.md](docs/PLAN.md).
 
 - Python 3.11+
 - **[Ollama](https://ollama.com)** — Hestia's local AI brain (required)
-- Node.js 18+ (for Pythia dev UI)
+- Node.js 22.12+ (for Pythia dev UI)
 
 ### Install Ollama
 
@@ -95,6 +98,8 @@ source .venv/bin/activate
 pytest tests/ -v --cov=hestia --cov-report=term-missing
 
 cd hestia/interfaces/pythia
+npm run typecheck
+npm run build
 npm run test:coverage
 ```
 
@@ -102,25 +107,75 @@ GitHub Actions publishes backend and frontend coverage in the workflow summary
 and attaches the full reports to each run. Coveralls combines both reports for
 the coverage badge at the top of this page.
 
-### Production
+### Production without Docker
 
 ```bash
 cd hestia/interfaces/pythia && npm run build
 hestia serve   # serves API + built Pythia at http://127.0.0.1:8000
 ```
 
+### Docker Compose
+
+Docker builds Pythia and Hestia into one non-root image. It does not include or
+publish Ollama; run Ollama on the host and keep port 11434 behind the host
+firewall.
+
+Create the runtime files locally:
+
+```bash
+cp config.yaml.example config.yaml
+cp .env.example .env
+openssl rand -hex 32   # replace HESTIA_API_TOKEN in .env
+```
+
+For the container, change these values in the untracked `config.yaml`:
+
+```yaml
+llm:
+  base_url: http://host.docker.internal:11434
+  allow_remote: true
+  allow_insecure_http: true  # only for the private Docker-to-host bridge
+
+mnemosyne:
+  backend: sqlite
+  database_path: /var/lib/hestia/mnemosyne.db
+```
+
+Compose supplies the container-only `0.0.0.0:8000` bind through environment
+overrides while publishing it only on the host's loopback interface.
+
+Then start and inspect the health probe:
+
+```bash
+docker compose up --build -d
+docker compose ps
+curl http://127.0.0.1:8000/health
+```
+
+On Linux, Ollama must accept connections from the Docker bridge; restrict
+11434 with the host firewall and never port-forward it. Hestia itself is
+published on host loopback only. Put an authenticated TLS reverse proxy in
+front if remote access is required.
+
+Compose mounts `config.yaml` and `.env` read-only, persists only
+`/var/lib/hestia`, and runs with a read-only root filesystem, dropped
+capabilities, and CPU/memory/PID limits. Tune the limits in
+`docker-compose.yml` after measuring the workload; do not store secrets in the
+image or Compose environment. See the
+[security architecture](docs/SECURITY_ARCHITECTURE.md) for deployment
+requirements.
+
 ## Security
 
 - All chat endpoints require `Authorization: Bearer <HESTIA_API_TOKEN>`
 - Never commit `.env` or `config.yaml`
+- Never expose Hestia or Ollama directly to the public internet
 - See [SECURITY.md](SECURITY.md) for vulnerability reporting
 
 ## Adding a module
 
-1. Pick an unused Greek mythological name
-2. Create `hestia/modules/<slug>/module.py` implementing `HestiaModule`
-3. Register in `config.yaml` under `modules.<slug>`
-4. Add an entry to `hestia/modules/loader.py`
+Follow the enforceable lifecycle, schema, risk, isolation, and test contract in
+[docs/MODULE_AUTHORING.md](docs/MODULE_AUTHORING.md).
 
 ## License
 

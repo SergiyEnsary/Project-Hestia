@@ -1,5 +1,5 @@
-from fastapi import APIRouter, Request
 import httpx
+from fastapi import APIRouter, Request
 
 router = APIRouter(tags=["health"])
 
@@ -19,6 +19,4 @@ async def health(request: Request) -> dict[str, str]:
         "status": "ok",
         "service": "hestia",
         "ollama": ollama_status,
-        "ollama_url": config.llm.base_url,
-        "model": config.llm.model,
     }

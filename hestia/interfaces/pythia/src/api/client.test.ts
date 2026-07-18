@@ -53,6 +53,9 @@ describe("Pythia API client", () => {
 
     expect(getToken()).toBe("secret");
     expect(getSessionId()).toBe("session-1");
+
+    setToken("   ");
+    expect(getToken()).toBeNull();
   });
 
   it("reports a missing token without making a request", async () => {
@@ -94,12 +97,26 @@ describe("Pythia API client", () => {
     expect(events).toEqual([{ type: "error", message: "No response stream" }]);
   });
 
+  it("reports network failures without exposing details", async () => {
+    setToken("token");
+    vi.mocked(fetch).mockRejectedValue(new Error("private network detail"));
+    const events: StreamEvent[] = [];
+
+    await streamChat("hello", (event) => events.push(event));
+
+    expect(events).toEqual([
+      { type: "error", message: "Unable to reach Hestia." },
+    ]);
+  });
+
   it("parses streamed events, ignores malformed data, and saves the session", async () => {
     setToken("token");
     const payload = [
-      'data: {"type":"session","session_id":"session-2"}\n',
+      'data: {"type":"session","session_id":"session-2"}\r\n',
       "data: not-json\n",
-      'data: {"type":"token","content":"Hello"}\n',
+      'data: {"type":"token","content":42}\n',
+      'data: {"type":"unexpected"}\n',
+      'data: {"type":"token","content":"Hello"}',
     ].join("");
     const reader = {
       read: vi
@@ -123,5 +140,12 @@ describe("Pythia API client", () => {
       { type: "session", session_id: "session-2" },
       { type: "token", content: "Hello" },
     ]);
+    expect(fetch).toHaveBeenCalledWith(
+      "/chat/stream",
+      expect.objectContaining({
+        method: "POST",
+        headers: expect.objectContaining({ Accept: "text/event-stream" }),
+      })
+    );
   });
 });

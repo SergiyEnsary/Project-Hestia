@@ -1,20 +1,25 @@
 from __future__ import annotations
 
+import logging
 import uuid
+from collections.abc import AsyncIterator
+from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.responses import StreamingResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from hestia.security.auth import verify_token
-from hestia.security.rate_limit import limiter
 
 router = APIRouter(tags=["chat"])
 _bearer = HTTPBearer(auto_error=False)
+logger = logging.getLogger(__name__)
 
 
 class ChatRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     message: str = Field(...)
     session_id: str | None = None
 
@@ -45,19 +50,24 @@ class ChatRequest(BaseModel):
 
 
 class ChatResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     session_id: str
     message: str
 
 
 async def _auth_dependency(
     request: Request,
-    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    credentials: Annotated[
+        HTTPAuthorizationCredentials | None,
+        Depends(_bearer),
+    ],
 ) -> None:
+    await request.app.state.rate_limiter.check(request)
     await verify_token(request, credentials)
 
 
 @router.post("/chat", response_model=ChatResponse)
-@limiter.limit("30/minute")
 async def chat(
     request: Request,
     body: ChatRequest,
@@ -73,7 +83,6 @@ async def chat(
 
 
 @router.post("/chat/stream")
-@limiter.limit("30/minute")
 async def chat_stream(
     request: Request,
     body: ChatRequest,
@@ -87,11 +96,21 @@ async def chat_stream(
 
     orchestrator = request.app.state.orchestrator
 
-    async def event_generator():
+    async def event_generator() -> AsyncIterator[str]:
         try:
             session_id, full_text = await orchestrator.run(body.session_id, body.message)
-        except Exception as exc:
-            yield f"data: {json.dumps({'type': 'error', 'message': str(exc)})}\n\n"
+        except Exception:
+            correlation_id = request.state.correlation_id
+            logger.exception(
+                "Streaming chat failed (correlation_id=%s)",
+                correlation_id,
+            )
+            payload = {
+                "type": "error",
+                "error": "internal_error",
+                "correlation_id": correlation_id,
+            }
+            yield f"data: {json.dumps(payload)}\n\n"
             return
         yield f"data: {json.dumps({'type': 'session', 'session_id': session_id})}\n\n"
         chunk_size = 24
@@ -100,4 +119,21 @@ async def chat_stream(
             yield f"data: {json.dumps({'type': 'token', 'content': chunk})}\n\n"
         yield f"data: {json.dumps({'type': 'done'})}\n\n"
 
-    return StreamingResponse(event_generator(), media_type="text/event-stream")
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache, no-store",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+@router.delete("/sessions/{session_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_session(
+    session_id: uuid.UUID,
+    request: Request,
+    _: None = Depends(_auth_dependency),
+) -> Response:
+    request.app.state.memory.clear(str(session_id))
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

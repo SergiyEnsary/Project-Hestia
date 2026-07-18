@@ -3,17 +3,20 @@ from __future__ import annotations
 import logging
 
 from hestia.config import HestiaConfig
+from hestia.core.llm.base import LLMProvider
 from hestia.core.llm.errors import OllamaUnavailableError
-from hestia.core.llm.ollama import OllamaProvider
 from hestia.core.mnemosyne import Mnemosyne
 from hestia.core.tools.models import ChatMessage
 from hestia.core.tools.registry import ToolRegistry
 
 logger = logging.getLogger(__name__)
 
-SYSTEM_PROMPT = """You are Hestia, a warm and capable home assistant named after the Greek goddess of the hearth.
+SYSTEM_PROMPT = """You are Hestia, a warm and capable home assistant named after
+the Greek goddess of the hearth.
 
-You help with everyday home life using the tools available to you. When a question needs live data (weather, calendar, etc.), use the appropriate tool rather than guessing.
+You help with everyday home life using the tools available to you. When a question
+needs live data (weather, calendar, etc.), use the appropriate tool rather than
+guessing.
 
 Available tools:
 {tools}
@@ -29,7 +32,7 @@ class Orchestrator:
     def __init__(
         self,
         config: HestiaConfig,
-        llm: OllamaProvider,
+        llm: LLMProvider,
         tools: ToolRegistry,
         memory: Mnemosyne,
     ) -> None:

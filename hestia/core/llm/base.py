@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from hestia.core.tools.models import ChatMessage, ToolCall, ToolDefinition
+from collections.abc import AsyncIterator
+from typing import Protocol
 
-from typing import AsyncIterator, Protocol
+from hestia.core.tools.models import ChatMessage, ToolDefinition
 
 
 class LLMProvider(Protocol):
@@ -12,7 +13,7 @@ class LLMProvider(Protocol):
         tools: list[ToolDefinition] | None = None,
     ) -> ChatMessage: ...
 
-    async def chat_stream(
+    def chat_stream(
         self,
         messages: list[ChatMessage],
         tools: list[ToolDefinition] | None = None,

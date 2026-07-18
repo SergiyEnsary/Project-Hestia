@@ -1,8 +1,6 @@
-import os
-from pathlib import Path
-
 import pytest
 import yaml
+from pydantic import ValidationError
 
 from hestia.config import HestiaConfig, _resolve_env, load_config
 
@@ -26,7 +24,7 @@ def test_load_config_from_tmp_path(tmp_path, monkeypatch):
     config = load_config()
     assert config.api_token == "from-env-file"
     assert config.llm.model == "test-model"
-    assert config.modules["zephyrus"]["enabled"] is False
+    assert config.modules.zephyrus.enabled is False
 
 
 def test_load_config_env_overrides_stale_shell(tmp_path, monkeypatch):
@@ -44,3 +42,29 @@ def test_hestia_config_defaults():
     assert config.llm.provider == "ollama"
     assert config.security.require_auth is True
     assert config.server.host == "127.0.0.1"
+
+
+def test_config_rejects_unknown_fields():
+    with pytest.raises(ValidationError):
+        HestiaConfig(security={"require_auth": True, "unknown": "value"})
+
+
+def test_remote_bind_requires_strong_authentication():
+    config = HestiaConfig(
+        server={"host": "0.0.0.0"},
+        api_token="short",
+    )
+    with pytest.raises(ValueError, match="32 characters"):
+        config.validate_runtime_safety()
+
+
+def test_remote_llm_requires_explicit_secure_transport():
+    with pytest.raises(ValidationError, match="allow_remote"):
+        HestiaConfig(llm={"base_url": "https://llm.example"})
+    with pytest.raises(ValidationError, match="allow_insecure_http"):
+        HestiaConfig(
+            llm={
+                "base_url": "http://host.docker.internal:11434",
+                "allow_remote": True,
+            }
+        )
