@@ -37,16 +37,73 @@ def test_load_config_env_overrides_stale_shell(tmp_path, monkeypatch):
     assert config.api_token == "file-token"
 
 
+def test_load_config_resolves_relative_echo_model_paths(tmp_path, monkeypatch):
+    config_data = {
+        "interfaces": {
+            "echo": {
+                "enabled": True,
+                "stt_model_path": ".hestia/models/whisper",
+                "tts_model_path": ".hestia/models/voice.onnx",
+            }
+        }
+    }
+    (tmp_path / "config.yaml").write_text(yaml.dump(config_data), encoding="utf-8")
+    (tmp_path / ".env").write_text("HESTIA_API_TOKEN=test\n", encoding="utf-8")
+    monkeypatch.setenv("HESTIA_CONFIG", str(tmp_path / "config.yaml"))
+
+    config = load_config()
+    assert config.interfaces.echo.stt_model_path == (tmp_path / ".hestia/models/whisper").resolve()
+    assert (
+        config.interfaces.echo.tts_model_path == (tmp_path / ".hestia/models/voice.onnx").resolve()
+    )
+
+
 def test_hestia_config_defaults():
     config = HestiaConfig()
     assert config.llm.provider == "ollama"
     assert config.security.require_auth is True
     assert config.server.host == "127.0.0.1"
+    assert config.interfaces.echo.enabled is False
+    assert config.interfaces.echo.max_audio_seconds == 30
 
 
 def test_config_rejects_unknown_fields():
     with pytest.raises(ValidationError):
         HestiaConfig(security={"require_auth": True, "unknown": "value"})
+    with pytest.raises(ValidationError):
+        HestiaConfig(interfaces={"echo": {"unknown": "value"}})
+
+
+def test_echo_requires_local_model_paths_when_enabled():
+    with pytest.raises(ValidationError, match="model_path"):
+        HestiaConfig(interfaces={"echo": {"enabled": True}})
+
+    config = HestiaConfig(
+        interfaces={
+            "echo": {
+                "enabled": True,
+                "stt_model_path": "/models/whisper",
+                "tts_model_path": "/models/voice.onnx",
+            }
+        }
+    )
+    assert config.interfaces.echo.stt_model_path is not None
+    assert config.interfaces.echo.tts_model_path is not None
+
+
+@pytest.mark.parametrize(
+    "field",
+    [
+        {"max_audio_bytes": 1},
+        {"max_audio_seconds": 0},
+        {"max_tts_characters": 0},
+        {"max_tts_audio_bytes": 1},
+        {"rate_limit_per_minute": 0},
+    ],
+)
+def test_echo_rejects_unsafe_limits(field):
+    with pytest.raises(ValidationError):
+        HestiaConfig(interfaces={"echo": field})
 
 
 def test_remote_bind_requires_strong_authentication():

@@ -227,7 +227,9 @@ Project Hestia/
 - Docker Compose for home server
 
 ### Phase 3 — Echo
-- **Echo** voice interface (STT → API → TTS)
+- **Echo** voice interface (local STT → authenticated API → local TTS)
+- Bounded raw-audio API and local faster-whisper/Piper inference first
+- Microphone client follows the stable voice API contract
 
 ### Phase 4 — Expand the pantheon
 - **Hephaestus** (Home Assistant), **Hermes** (MQTT), **Clio** (reminders)
@@ -267,5 +269,7 @@ Track build progress here. Update as phases complete.
   - [x] Mnemosyne SQLite persistence and retention
   - [x] Hardened Docker Compose deployment
   - [ ] Optional S3 backups and SSM secrets
-- [ ] Phase 3 — Echo
+- [x] Phase 3 — Echo
+  - [x] Authenticated, bounded local STT → orchestrator → TTS API
+  - [x] Same-origin microphone capture and audio playback client
 - [ ] Phase 4 — Hephaestus, Hermes, Clio

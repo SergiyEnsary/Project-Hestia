@@ -3,6 +3,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   getSessionId,
   getToken,
+  isEchoAvailable,
+  sendEcho,
   setSessionId,
   setToken,
   streamChat,
@@ -95,6 +97,61 @@ describe("Pythia API client", () => {
     await streamChat("hello", (event) => events.push(event));
 
     expect(events).toEqual([{ type: "error", message: "No response stream" }]);
+  });
+
+  it("checks Echo readiness without requesting microphone access", async () => {
+    expect(await isEchoAvailable()).toBe(false);
+    expect(fetch).not.toHaveBeenCalled();
+
+    setToken("token");
+    vi.mocked(fetch).mockResolvedValue({ ok: true } as Response);
+    expect(await isEchoAvailable()).toBe(true);
+    expect(fetch).toHaveBeenCalledWith("/echo", {
+      headers: { Authorization: "Bearer token" },
+    });
+  });
+
+  it("sends recorded audio to Echo and preserves its session", async () => {
+    setToken("token");
+    setSessionId("session-1");
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue({
+        session_id: "session-2",
+        transcript: "hello",
+        message: "Hello there.",
+        audio_base64: "UklGRg==",
+        audio_media_type: "audio/wav",
+        audio_truncated: false,
+      }),
+    } as unknown as Response);
+
+    const response = await sendEcho(new Blob(["audio"], { type: "audio/webm" }));
+
+    expect(response.transcript).toBe("hello");
+    expect(getSessionId()).toBe("session-2");
+    expect(fetch).toHaveBeenCalledWith(
+      "/echo",
+      expect.objectContaining({
+        method: "POST",
+        headers: expect.objectContaining({
+          Authorization: "Bearer token",
+          "Content-Type": "audio/webm",
+          "X-Hestia-Session-ID": "session-1",
+        }),
+      })
+    );
+  });
+
+  it("rejects invalid Echo responses", async () => {
+    setToken("token");
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue({ session_id: "incomplete" }),
+    } as unknown as Response);
+    await expect(sendEcho(new Blob(["audio"]))).rejects.toThrow(
+      "Echo returned an invalid response."
+    );
   });
 
   it("reports network failures without exposing details", async () => {

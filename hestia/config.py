@@ -138,6 +138,24 @@ class PythiaConfig(StrictConfig):
 
 class EchoConfig(StrictConfig):
     enabled: bool = False
+    stt_model_path: Path | None = None
+    tts_model_path: Path | None = None
+    language: str = Field(default="en", min_length=2, max_length=16)
+    compute_type: str = Field(default="int8", min_length=1, max_length=32)
+    max_audio_bytes: int = Field(default=10_000_000, ge=1024, le=50_000_000)
+    max_audio_seconds: int = Field(default=30, ge=1, le=300)
+    max_tts_characters: int = Field(default=2000, ge=1, le=10_000)
+    max_tts_audio_bytes: int = Field(default=15_000_000, ge=1024, le=50_000_000)
+    rate_limit_per_minute: int = Field(default=6, ge=1, le=60)
+
+    @model_validator(mode="after")
+    def validate_model_paths(self) -> EchoConfig:
+        if self.enabled and (self.stt_model_path is None or self.tts_model_path is None):
+            raise ValueError(
+                "interfaces.echo.stt_model_path and tts_model_path are required "
+                "when Echo is enabled"
+            )
+        return self
 
 
 class InterfacesConfig(StrictConfig):
@@ -236,4 +254,9 @@ def load_config() -> HestiaConfig:
         config.mnemosyne.database_path = (
             config_path.parent / config.mnemosyne.database_path
         ).resolve()
+    echo = config.interfaces.echo
+    if echo.stt_model_path is not None and not echo.stt_model_path.is_absolute():
+        echo.stt_model_path = (config_path.parent / echo.stt_model_path).resolve()
+    if echo.tts_model_path is not None and not echo.tts_model_path.is_absolute():
+        echo.tts_model_path = (config_path.parent / echo.tts_model_path).resolve()
     return config

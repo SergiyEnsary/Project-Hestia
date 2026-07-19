@@ -19,6 +19,16 @@ interfaces:
     enabled: true
   echo:
     enabled: false
+    # Download local models before enabling Echo. Model files are never fetched at runtime.
+    stt_model_path: /var/lib/hestia/models/faster-whisper-small.en
+    tts_model_path: /var/lib/hestia/models/en_US-lessac-medium.onnx
+    language: en
+    compute_type: int8
+    max_audio_bytes: 10000000
+    max_audio_seconds: 30
+    max_tts_characters: 2000
+    max_tts_audio_bytes: 15000000
+    rate_limit_per_minute: 6
 
 mnemosyne:
   backend: sqlite

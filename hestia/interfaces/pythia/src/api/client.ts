@@ -31,6 +31,78 @@ export interface StreamEvent {
   correlation_id?: string;
 }
 
+export interface EchoResponse {
+  session_id: string;
+  transcript: string;
+  message: string;
+  audio_base64: string;
+  audio_media_type: "audio/wav";
+  audio_truncated: boolean;
+}
+
+function authorizationHeaders(): Record<string, string> | null {
+  const token = getToken();
+  return token ? { Authorization: `Bearer ${token}` } : null;
+}
+
+export async function isEchoAvailable(): Promise<boolean> {
+  const headers = authorizationHeaders();
+  if (!headers) return false;
+  try {
+    const response = await fetch("/echo", { headers });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+function parseEchoResponse(value: unknown): EchoResponse | null {
+  if (typeof value !== "object" || value === null) return null;
+  const response = value as Record<string, unknown>;
+  if (
+    typeof response.session_id !== "string" ||
+    typeof response.transcript !== "string" ||
+    typeof response.message !== "string" ||
+    typeof response.audio_base64 !== "string" ||
+    response.audio_media_type !== "audio/wav" ||
+    typeof response.audio_truncated !== "boolean"
+  ) {
+    return null;
+  }
+  return response as unknown as EchoResponse;
+}
+
+export async function sendEcho(audio: Blob): Promise<EchoResponse> {
+  const headers = authorizationHeaders();
+  if (!headers) throw new Error("Set your API token in settings first.");
+  const sessionId = getSessionId();
+  const response = await fetch("/echo", {
+    method: "POST",
+    headers: {
+      ...headers,
+      "Content-Type": audio.type || "audio/webm",
+      ...(sessionId ? { "X-Hestia-Session-ID": sessionId } : {}),
+    },
+    body: audio,
+  });
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error("Unauthorized — check your API token.");
+    }
+    if (response.status === 413) {
+      throw new Error("Recording is too large.");
+    }
+    if (response.status === 422) {
+      throw new Error("No usable speech was detected.");
+    }
+    throw new Error("Echo is unavailable.");
+  }
+  const parsed = parseEchoResponse(await response.json());
+  if (!parsed) throw new Error("Echo returned an invalid response.");
+  setSessionId(parsed.session_id);
+  return parsed;
+}
+
 function parseStreamEvent(value: unknown): StreamEvent | null {
   if (typeof value !== "object" || value === null) return null;
   const event = value as Record<string, unknown>;

@@ -91,6 +91,41 @@ npm run dev    # http://localhost:5173 — proxies API to :8000
 
 Open Pythia, enter your `HESTIA_API_TOKEN` in settings, and chat with Hestia.
 
+### Echo (local voice API)
+
+Echo is disabled by default. It accepts bounded encoded audio, performs local
+speech recognition, sends the transcript through the same authenticated Hestia
+orchestrator, and returns both the reply and local Piper speech as
+base64-encoded WAV audio. When Echo is enabled, Pythia's **Voice** control
+checks backend readiness before requesting same-origin microphone permission,
+then records, submits, and plays the local response.
+
+Install the optional local speech engines:
+
+```bash
+pip install -e ".[dev,echo]"
+```
+
+Download a faster-whisper model directory and a Piper `.onnx` voice plus its
+companion `.onnx.json` file into `.hestia/models/`. Set their paths under
+`interfaces.echo` in `config.yaml`, then set `enabled: true`. Hestia never
+downloads speech models at startup.
+
+The endpoint accepts `audio/wav`, `audio/webm`, `audio/ogg`, `audio/mpeg`, and
+`audio/mp4`:
+
+```bash
+curl --request POST http://127.0.0.1:8000/echo \
+  --header "Authorization: Bearer $HESTIA_API_TOKEN" \
+  --header "Content-Type: audio/wav" \
+  --data-binary @question.wav
+```
+
+Pass `X-Hestia-Session-ID` with the UUID returned by an earlier response to
+continue that conversation. Audio is processed in memory and is not stored;
+Mnemosyne retains the resulting transcript and assistant reply under its normal
+retention policy.
+
 ### Tests
 
 ```bash
@@ -152,6 +187,12 @@ docker compose ps
 curl http://127.0.0.1:8000/health
 ```
 
+To build the optional Echo dependencies into the container, use
+`HESTIA_EXTRAS=echo docker compose up --build -d`. Store speech models below
+`/var/lib/hestia/models` in the existing persistent volume and use those paths
+in `config.yaml`. Measure memory and CPU usage before increasing concurrency or
+loosening the supplied container limits.
+
 On Linux, Ollama must accept connections from the Docker bridge; restrict
 11434 with the host firewall and never port-forward it. Hestia itself is
 published on host loopback only. Put an authenticated TLS reverse proxy in
@@ -167,7 +208,7 @@ requirements.
 
 ## Security
 
-- All chat endpoints require `Authorization: Bearer <HESTIA_API_TOKEN>`
+- All chat and Echo endpoints require `Authorization: Bearer <HESTIA_API_TOKEN>`
 - Never commit `.env` or `config.yaml`
 - Never expose Hestia or Ollama directly to the public internet
 - See [SECURITY.md](SECURITY.md) for vulnerability reporting

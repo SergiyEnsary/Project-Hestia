@@ -12,8 +12,9 @@ class ConfigurableRateLimiter:
         self._requests: dict[str, deque[float]] = defaultdict(deque)
         self._lock = asyncio.Lock()
 
-    async def check(self, request: Request) -> None:
-        limit = request.app.state.config.security.rate_limit_per_minute
+    async def check(self, request: Request, limit: int | None = None) -> None:
+        if limit is None:
+            limit = request.app.state.config.security.rate_limit_per_minute
         host = request.client.host if request.client else "unknown"
         route = request.url.path
         key = f"{host}:{route}"

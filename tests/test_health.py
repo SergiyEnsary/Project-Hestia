@@ -16,6 +16,8 @@ def test_health_includes_ollama_status(client):
     assert response.headers["x-content-type-options"] == "nosniff"
     assert response.headers["x-frame-options"] == "DENY"
     assert "default-src 'self'" in response.headers["content-security-policy"]
+    assert "media-src 'self' blob:" in response.headers["content-security-policy"]
+    assert "microphone=()" in response.headers["permissions-policy"]
     assert response.headers["x-request-id"]
 
 

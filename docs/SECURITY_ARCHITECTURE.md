@@ -7,7 +7,8 @@ documented threat-model review and tests.
 ## Assets and trust boundaries
 
 Protected assets include API tokens, private calendar URLs, OAuth/device
-credentials, conversation history, tool results, and local-network access.
+credentials, voice recordings and transcripts, conversation history, tool
+results, and local-network access.
 
 Hestia crosses these trust boundaries:
 
@@ -30,7 +31,7 @@ host or a private container network.
 
 ## Authentication and network exposure
 
-- `POST /chat` and `POST /chat/stream` (SSE) MUST require
+- `POST /chat`, `POST /chat/stream` (SSE), and the optional `POST /echo` MUST require
   `Authorization: Bearer <token>`. Missing and invalid credentials return the
   same generic `401` response.
 - `HESTIA_API_TOKEN` MUST be generated from at least 32 random bytes. It MUST
@@ -49,6 +50,30 @@ Pythia may keep the token in `sessionStorage`; it MUST NOT use `localStorage`,
 cookies without a reviewed CSRF design, `VITE_*` variables, or committed files.
 Users should treat any script running in Pythia's origin as able to read the
 session token.
+
+## Voice processing
+
+Echo is disabled by default and uses only explicitly configured local STT and
+TTS model paths. It MUST NOT silently download models or fall back to a cloud
+speech service. The API allowlists encoded audio media types, limits both the
+encoded body size and decoded duration, applies a dedicated rate limit, and
+rejects empty or overlong transcripts before invoking the orchestrator.
+
+Recordings are processed in memory and MUST NOT be written to logs or retained
+as files. Only the transcript and assistant response enter Mnemosyne under the
+configured conversation-retention policy. Errors MUST NOT expose audio,
+transcripts, model paths, decoder output, or speech-engine exceptions.
+
+Speech inference is serialized initially to bound CPU and memory pressure.
+Generated speech is length-limited independently from the full text response,
+and the response states when spoken output was truncated. Model files are
+runtime data, not image content or source-controlled assets.
+
+Pythia checks the authenticated Echo status endpoint before requesting
+microphone access. The served Permissions Policy allows microphone capture only
+from the same origin and only while Echo is enabled; camera, geolocation, and
+cross-origin microphone access remain denied. Browser audio is sent only to the
+configured Hestia origin, not to a browser speech-recognition vendor.
 
 ## Secrets and configuration
 

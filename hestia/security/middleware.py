@@ -26,12 +26,15 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; script-src 'self'; style-src 'self'; "
             "connect-src 'self'; img-src 'self' data:; object-src 'none'; "
-            "base-uri 'self'; frame-ancestors 'none'"
+            "media-src 'self' blob:; base-uri 'self'; frame-ancestors 'none'"
         )
         response.headers["Referrer-Policy"] = "no-referrer"
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "DENY"
-        response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+        microphone_policy = "(self)" if request.app.state.config.interfaces.echo.enabled else "()"
+        response.headers["Permissions-Policy"] = (
+            f"camera=(), microphone={microphone_policy}, geolocation=()"
+        )
         if request.url.scheme == "https":
             response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
         return response

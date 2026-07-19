@@ -2,6 +2,8 @@ services:
   hestia:
     build:
       context: .
+      args:
+        HESTIA_EXTRAS: ${HESTIA_EXTRAS:-}
     restart: unless-stopped
     init: true
     user: "10001:10001"

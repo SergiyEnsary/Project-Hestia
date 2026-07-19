@@ -99,12 +99,19 @@
   font-style: italic;
 }
 
-.message-input {
+.composer {
   display: flex;
+  align-items: stretch;
   gap: 0.75rem;
   padding: 1rem 1.25rem;
   border-top: 1px solid #2e2a26;
   background: #211e1b;
+}
+
+.message-input {
+  flex: 1;
+  display: flex;
+  gap: 0.75rem;
 }
 
 .message-input textarea {
@@ -142,6 +149,42 @@
   border-radius: 8px;
   background: transparent;
   color: #e8e6e3;
+}
+
+.voice-controls {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+}
+
+.btn-voice {
+  min-width: 4.5rem;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid #3a3530;
+  border-radius: 8px;
+  background: transparent;
+  color: #e8e6e3;
+  font-weight: 600;
+}
+
+.btn-voice.active {
+  border-color: #d08a4d;
+  background: #4a2b20;
+  color: #ffd6b3;
+}
+
+.btn-voice:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.voice-status {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
 }
 
 .error-banner {
@@ -212,4 +255,15 @@ code {
   background: #2a2622;
   padding: 0.1em 0.35em;
   border-radius: 4px;
+}
+
+@media (max-width: 560px) {
+  .composer {
+    flex-wrap: wrap;
+  }
+
+  .voice-controls,
+  .btn-voice {
+    width: 100%;
+  }
 }

@@ -10,12 +10,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from hestia.api.routes import chat, health
+from hestia.api.routes import chat, echo, health
 from hestia.config import HestiaConfig, load_config
 from hestia.core.llm.ollama import OllamaProvider
 from hestia.core.mnemosyne import Mnemosyne
 from hestia.core.orchestrator import Orchestrator
 from hestia.core.tools.registry import ToolRegistry
+from hestia.interfaces.echo import EchoService
 from hestia.modules.base import HestiaModule
 from hestia.modules.loader import load_modules, teardown_modules
 from hestia.security.logging import install_redacting_filters
@@ -46,16 +47,21 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     modules: list[HestiaModule] = []
     llm: OllamaProvider | None = None
     memory: Mnemosyne | None = None
+    echo_service: EchoService | None = None
     try:
         modules = await load_modules(config, registry)
         llm = OllamaProvider(config.llm)
         memory = Mnemosyne(config.mnemosyne)
         orchestrator = Orchestrator(config, llm, registry, memory)
+        if config.interfaces.echo.enabled:
+            echo_service = EchoService(config.interfaces.echo)
+            await echo_service.start()
 
         app.state.orchestrator = orchestrator
         app.state.modules = modules
         app.state.llm = llm
         app.state.memory = memory
+        app.state.echo = echo_service
 
         logger.info("Hestia started on %s:%s", config.server.host, config.server.port)
         yield
@@ -65,6 +71,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             await llm.close()
         if memory is not None:
             memory.close()
+        if echo_service is not None:
+            await echo_service.close()
         logger.info("Hestia shut down")
 
 
@@ -88,13 +96,20 @@ def create_app(config: HestiaConfig | None = None) -> FastAPI:
         allow_origins=config.security.allowed_origins,
         allow_credentials=False,
         allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
-        allow_headers=["Authorization", "Content-Type", "X-Request-ID"],
+        allow_headers=[
+            "Authorization",
+            "Content-Type",
+            "X-Hestia-Session-ID",
+            "X-Request-ID",
+        ],
     )
     app.add_middleware(CorrelationIDMiddleware)
     app.add_middleware(SecurityHeadersMiddleware)
 
     app.include_router(health.router)
     app.include_router(chat.router)
+    if config.interfaces.echo.enabled:
+        app.include_router(echo.router)
 
     pythia_dist = config.pythia_dist
     if pythia_dist.is_dir():

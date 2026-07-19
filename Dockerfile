@@ -23,7 +23,12 @@ WORKDIR /app
 COPY pyproject.toml README.md ./
 COPY hestia/ ./hestia/
 COPY --from=pythia-build /build/pythia/dist/ ./hestia/interfaces/pythia/dist/
-RUN pip install --no-cache-dir .
+ARG HESTIA_EXTRAS=""
+RUN if [ -n "$HESTIA_EXTRAS" ]; then \
+        pip install --no-cache-dir ".[${HESTIA_EXTRAS}]"; \
+    else \
+        pip install --no-cache-dir .; \
+    fi
 
 USER 10001:10001
 EXPOSE 8000
