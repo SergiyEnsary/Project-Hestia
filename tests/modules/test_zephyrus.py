@@ -3,6 +3,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from hestia.config import ZephyrusConfig
 from hestia.modules.zephyrus.module import ZephyrusModule
 
 
@@ -16,7 +17,7 @@ def _mock_response(data: dict) -> MagicMock:
 @pytest.fixture
 async def zephyrus():
     module = ZephyrusModule()
-    await module.setup({"default_location": "London", "units": "metric"})
+    await module.setup(ZephyrusConfig(default_location="London", units="metric"))
     yield module
     await module.teardown()
 
@@ -125,12 +126,20 @@ async def test_module_metadata(zephyrus):
 @pytest.mark.asyncio
 async def test_imperial_units():
     module = ZephyrusModule()
-    await module.setup({"default_location": "Austin", "units": "imperial"})
+    await module.setup(ZephyrusConfig(default_location="Austin", units="imperial"))
     geocode_response = _mock_response(
         {"results": [{"name": "Austin", "latitude": 30.0, "longitude": -97.0, "country": "US"}]}
     )
     forecast_response = _mock_response(
-        {"current": {"temperature_2m": 85.0, "relative_humidity_2m": 50, "weather_code": 0, "wind_speed_10m": 5, "time": "t"}}
+        {
+            "current": {
+                "temperature_2m": 85.0,
+                "relative_humidity_2m": 50,
+                "weather_code": 0,
+                "wind_speed_10m": 5,
+                "time": "t",
+            }
+        }
     )
 
     async def mock_get(url, params=None):

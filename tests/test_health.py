@@ -1,8 +1,6 @@
-import json
-import httpx
 from unittest.mock import AsyncMock, patch
 
-from hestia.core.tools.models import ChatMessage
+import httpx
 
 
 def test_health_includes_ollama_status(client):
@@ -13,7 +11,14 @@ def test_health_includes_ollama_status(client):
     assert data["service"] == "hestia"
     assert "ollama" in data
     assert data["ollama"] in ("ok", "unreachable", "error", "unknown")
-    assert "model" in data
+    assert "model" not in data
+    assert "ollama_url" not in data
+    assert response.headers["x-content-type-options"] == "nosniff"
+    assert response.headers["x-frame-options"] == "DENY"
+    assert "default-src 'self'" in response.headers["content-security-policy"]
+    assert "media-src 'self' blob:" in response.headers["content-security-policy"]
+    assert "microphone=()" in response.headers["permissions-policy"]
+    assert response.headers["x-request-id"]
 
 
 def test_health_ollama_unreachable(client):

@@ -1,4 +1,6 @@
-# Secrets and local config
+.git
+.github
+.cursor
 .env
 .env.*
 !.env.example
@@ -7,35 +9,26 @@ secrets/
 *.pem
 *.key
 
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.egg-info/
-.eggs/
-dist/
-build/
 .venv/
 venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
-htmlcov/
 .coverage
 coverage/
+htmlcov/
+tests/
 
-# Node / Pythia
 node_modules/
 hestia/interfaces/pythia/dist/
+hestia/interfaces/pythia/coverage/
 
-# Runtime data
 .hestia/
-
-# IDE
-.idea/
-.vscode/
-*.swp
-.DS_Store
-
-# Logs
+*.db
+*.sqlite
+*.sqlite3
 *.log
+.DS_Store

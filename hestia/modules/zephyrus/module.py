@@ -6,8 +6,9 @@ from typing import Any
 
 import httpx
 
-from hestia.core.tools.models import ToolDefinition
-from hestia.modules.base import RegisteredTool
+from hestia.config import StrictConfig, ZephyrusConfig
+from hestia.core.tools.models import RiskLevel, ToolDefinition
+from hestia.modules.base import HestiaModule, RegisteredTool
 
 logger = logging.getLogger(__name__)
 
@@ -15,20 +16,26 @@ GEOCODING_URL = "https://geocoding-api.open-meteo.com/v1/search"
 FORECAST_URL = "https://api.open-meteo.com/v1/forecast"
 
 
-class ZephyrusModule:
+class ZephyrusModule(HestiaModule):
     slug = "zephyrus"
     display_name = "Zephyrus"
     domain = "Weather and forecasts"
+    config_type = ZephyrusConfig
 
     def __init__(self) -> None:
         self._default_location = "San Francisco"
         self._units = "metric"
         self._client: httpx.AsyncClient | None = None
 
-    async def setup(self, config: dict[str, Any]) -> None:
-        self._default_location = config.get("default_location", self._default_location)
-        self._units = config.get("units", self._units)
-        self._client = httpx.AsyncClient(timeout=30.0)
+    async def setup(self, config: StrictConfig) -> None:
+        if not isinstance(config, ZephyrusConfig):
+            raise TypeError("Zephyrus requires ZephyrusConfig")
+        self._default_location = config.default_location
+        self._units = config.units
+        self._client = httpx.AsyncClient(
+            timeout=httpx.Timeout(30.0),
+            follow_redirects=False,
+        )
 
     async def teardown(self) -> None:
         if self._client:
@@ -41,15 +48,19 @@ class ZephyrusModule:
                 definition=ToolDefinition(
                     name="zephyrus.get_current_weather",
                     description="Get current weather for a location (city name or coordinates).",
+                    risk_level=RiskLevel.READ,
                     parameters={
                         "type": "object",
                         "properties": {
                             "location": {
                                 "type": "string",
                                 "description": "City name, e.g. 'London' or 'San Francisco'",
+                                "minLength": 1,
+                                "maxLength": 200,
                             },
                         },
                         "required": ["location"],
+                        "additionalProperties": False,
                     },
                 ),
                 handler=self._get_current_weather,
@@ -58,12 +69,15 @@ class ZephyrusModule:
                 definition=ToolDefinition(
                     name="zephyrus.get_forecast",
                     description="Get a multi-day weather forecast for a location.",
+                    risk_level=RiskLevel.READ,
                     parameters={
                         "type": "object",
                         "properties": {
                             "location": {
                                 "type": "string",
                                 "description": "City name, e.g. 'London'",
+                                "minLength": 1,
+                                "maxLength": 200,
                             },
                             "days": {
                                 "type": "integer",
@@ -73,6 +87,7 @@ class ZephyrusModule:
                             },
                         },
                         "required": ["location"],
+                        "additionalProperties": False,
                     },
                 ),
                 handler=self._get_forecast,
@@ -114,7 +129,7 @@ class ZephyrusModule:
         location = args.get("location") or self._default_location
         lat, lon, label = await self._geocode(location)
         assert self._client is not None
-        params = {
+        params: dict[str, str | int | float | bool | None] = {
             "latitude": lat,
             "longitude": lon,
             "current": "temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m",
@@ -140,7 +155,7 @@ class ZephyrusModule:
         days = min(max(int(args.get("days", 3)), 1), 7)
         lat, lon, label = await self._geocode(location)
         assert self._client is not None
-        params = {
+        params: dict[str, str | int | float | bool | None] = {
             "latitude": lat,
             "longitude": lon,
             "daily": "temperature_2m_max,temperature_2m_min,weather_code,precipitation_sum",

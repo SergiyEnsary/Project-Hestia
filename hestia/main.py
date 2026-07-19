@@ -7,6 +7,7 @@ import sys
 import uvicorn
 
 from hestia.config import load_config
+from hestia.security.logging import install_redacting_filters
 from hestia.security.redact import redact
 
 
@@ -18,18 +19,18 @@ class RedactingFormatter(logging.Formatter):
 
 def _setup_logging() -> None:
     handler = logging.StreamHandler(sys.stdout)
-    handler.setFormatter(
-        RedactingFormatter("%(asctime)s %(levelname)s [%(name)s] %(message)s")
-    )
+    handler.setFormatter(RedactingFormatter("%(asctime)s %(levelname)s [%(name)s] %(message)s"))
     root = logging.getLogger()
     root.handlers.clear()
     root.addHandler(handler)
     root.setLevel(logging.INFO)
+    install_redacting_filters()
 
 
 def serve() -> None:
     _setup_logging()
     config = load_config()
+    config.validate_runtime_safety()
     uvicorn.run(
         "hestia.api.app:create_app",
         factory=True,

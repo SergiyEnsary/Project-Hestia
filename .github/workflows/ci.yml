@@ -7,14 +7,157 @@ on:
     branches: [main, master]
 
 jobs:
-  test:
+  backend-quality:
+    name: Backend lint and typecheck
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - name: Install
+          cache: pip
+      - name: Install backend
         run: pip install -e ".[dev]"
-      - name: Run tests
-        run: pytest tests/ -v
+      - name: Check backend formatting
+        run: ruff format --check hestia tests
+      - name: Lint backend
+        run: ruff check hestia tests
+      - name: Typecheck backend
+        run: mypy hestia
+
+  backend-coverage:
+    name: Backend coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install backend
+        run: pip install -e ".[dev]"
+      - name: Test with coverage
+        run: >
+          pytest tests/ -v
+          --cov=hestia
+          --cov-report=term-missing
+          --cov-report=json:coverage/backend.json
+          --cov-report=xml:coverage/backend.xml
+          --cov-report=html:coverage/html
+          --cov-report=lcov:coverage/lcov.info
+      - name: Add coverage summary
+        run: |
+          python - <<'PY'
+          import json
+          import os
+
+          with open("coverage/backend.json", encoding="utf-8") as report:
+              totals = json.load(report)["totals"]
+
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as summary:
+              summary.write("## Backend coverage\n\n")
+              summary.write("| Lines covered | Total lines | Coverage |\n")
+              summary.write("| ---: | ---: | ---: |\n")
+              summary.write(
+                  f"| {totals['covered_lines']} | {totals['num_statements']} "
+                  f"| **{totals['percent_covered_display']}%** |\n"
+              )
+          PY
+      - name: Publish backend coverage
+        uses: coverallsapp/github-action@v2
+        with:
+          file: coverage/lcov.info
+          format: lcov
+          flag-name: backend
+          parallel: true
+          fail-on-error: false
+      - name: Upload backend coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage
+          path: coverage/
+          if-no-files-found: error
+
+  frontend-quality:
+    name: Frontend typecheck and build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: hestia/interfaces/pythia
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.12"
+          cache: npm
+          cache-dependency-path: hestia/interfaces/pythia/package-lock.json
+      - name: Install frontend
+        run: npm ci
+      - name: Audit frontend dependencies
+        run: npm audit --audit-level=high
+      - name: Typecheck frontend
+        run: npm run typecheck
+      - name: Build frontend
+        run: npm run build
+
+  frontend-coverage:
+    name: Frontend coverage
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: hestia/interfaces/pythia
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.12"
+          cache: npm
+          cache-dependency-path: hestia/interfaces/pythia/package-lock.json
+      - name: Install frontend
+        run: npm ci
+      - name: Test with coverage
+        run: npm run test:coverage
+      - name: Add coverage summary
+        run: |
+          node <<'NODE'
+          const fs = require("node:fs");
+          const report = JSON.parse(
+            fs.readFileSync("coverage/coverage-summary.json", "utf8")
+          ).total;
+          const metrics = ["lines", "statements", "functions", "branches"];
+          const rows = metrics
+            .map((metric) => `| ${metric} | ${report[metric].covered} | ${report[metric].total} | **${report[metric].pct}%** |`)
+            .join("\n");
+          fs.appendFileSync(
+            process.env.GITHUB_STEP_SUMMARY,
+            `## Frontend coverage\n\n| Metric | Covered | Total | Coverage |\n| --- | ---: | ---: | ---: |\n${rows}\n`
+          );
+          NODE
+      - name: Publish frontend coverage
+        uses: coverallsapp/github-action@v2
+        with:
+          file: hestia/interfaces/pythia/coverage/lcov.info
+          format: lcov
+          base-path: hestia/interfaces/pythia
+          flag-name: frontend
+          parallel: true
+          fail-on-error: false
+      - name: Upload frontend coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-coverage
+          path: hestia/interfaces/pythia/coverage/
+          if-no-files-found: error
+
+  publish-coverage:
+    name: Publish combined coverage
+    needs: [backend-coverage, frontend-coverage]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Finish Coveralls build
+        uses: coverallsapp/github-action@v2
+        with:
+          parallel-finished: true
+          carryforward: backend,frontend
+          fail-on-error: false

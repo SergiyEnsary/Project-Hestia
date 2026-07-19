@@ -1,3 +1,6 @@
+import logging
+
+from hestia.security.logging import RedactingFilter
 from hestia.security.redact import redact
 
 
@@ -20,3 +23,22 @@ def test_redact_ical_url():
 def test_redact_preserves_safe_text():
     msg = "Hestia started on 127.0.0.1:8000"
     assert redact(msg) == msg
+
+
+def test_redact_full_calendar_url():
+    msg = "ical_url=https://calendar.example/private-token/basic.ics"
+    assert "private-token" not in redact(msg)
+
+
+def test_logging_filter_redacts_formatted_arguments():
+    record = logging.LogRecord(
+        "test",
+        logging.ERROR,
+        __file__,
+        1,
+        "Request used %s",
+        ("Bearer secret-token",),
+        None,
+    )
+    assert RedactingFilter().filter(record)
+    assert "secret-token" not in record.getMessage()
