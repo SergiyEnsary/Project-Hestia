@@ -39,19 +39,23 @@ class FakeMediaRecorder {
 }
 
 describe("VoiceControls", () => {
-  let playMock: ReturnType<typeof vi.fn>;
+  let playMock: ReturnType<typeof vi.fn<() => Promise<void>>>;
 
   beforeEach(() => {
     isEchoAvailable.mockReset();
     sendEcho.mockReset();
     FakeMediaRecorder.emitEmptyChunk = false;
     FakeMediaRecorder.isTypeSupported = vi.fn(() => true);
-    playMock = vi.fn().mockResolvedValue(undefined);
+    playMock = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
 
     vi.stubGlobal(
       "Audio",
-      vi.fn(function Audio(this: { play: () => Promise<void>; pause: () => void; onended: (() => void) | null }) {
-        this.play = playMock;
+      vi.fn(function Audio(this: {
+        play: () => Promise<void>;
+        pause: () => void;
+        onended: (() => void) | null;
+      }) {
+        this.play = () => playMock();
         this.pause = vi.fn();
         this.onended = null;
         return this;
