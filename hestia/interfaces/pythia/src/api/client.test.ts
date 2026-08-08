@@ -166,6 +166,92 @@ describe("Pythia API client", () => {
     ]);
   });
 
+  it("maps Echo HTTP error statuses", async () => {
+    setToken("token");
+    for (const [status, message] of [
+      [401, "Unauthorized — check your API token."],
+      [413, "Recording is too large."],
+      [422, "No usable speech was detected."],
+      [500, "Echo is unavailable."],
+    ] as const) {
+      vi.mocked(fetch).mockResolvedValueOnce({
+        ok: false,
+        status,
+      } as Response);
+      await expect(sendEcho(new Blob(["audio"]))).rejects.toThrow(message);
+    }
+  });
+
+  it("requires a token before sending Echo audio", async () => {
+    await expect(sendEcho(new Blob(["audio"]))).rejects.toThrow(
+      "Set your API token in settings first."
+    );
+  });
+
+  it("treats Echo readiness network failures as unavailable", async () => {
+    setToken("token");
+    vi.mocked(fetch).mockRejectedValue(new Error("offline"));
+    expect(await isEchoAvailable()).toBe(false);
+  });
+
+  it("reports non-auth stream HTTP errors and interrupted readers", async () => {
+    setToken("token");
+    vi.mocked(fetch).mockResolvedValueOnce({
+      ok: false,
+      status: 503,
+    } as Response);
+    const statusEvents: StreamEvent[] = [];
+    await streamChat("hello", (event) => statusEvents.push(event));
+    expect(statusEvents).toEqual([{ type: "error", message: "Error 503" }]);
+
+    const reader = {
+      read: vi.fn().mockRejectedValue(new Error("cut")),
+    };
+    vi.mocked(fetch).mockResolvedValueOnce({
+      ok: true,
+      body: { getReader: () => reader },
+    } as unknown as Response);
+    const interruptEvents: StreamEvent[] = [];
+    await streamChat("hello", (event) => interruptEvents.push(event));
+    expect(interruptEvents).toEqual([
+      { type: "error", message: "The response stream was interrupted." },
+    ]);
+  });
+
+  it("accepts done and error stream events", async () => {
+    setToken("token");
+    const payload = [
+      'data: {"type":"error","message":"nope","error":"x","correlation_id":"c1"}\n',
+      'data: {"type":"done"}\n',
+    ].join("");
+    const reader = {
+      read: vi
+        .fn()
+        .mockResolvedValueOnce({
+          done: false,
+          value: new TextEncoder().encode(payload),
+        })
+        .mockResolvedValueOnce({ done: true, value: undefined }),
+    };
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      body: { getReader: () => reader },
+    } as unknown as Response);
+    const events: StreamEvent[] = [];
+
+    await streamChat("hello", (event) => events.push(event));
+
+    expect(events).toEqual([
+      {
+        type: "error",
+        message: "nope",
+        error: "x",
+        correlation_id: "c1",
+      },
+      { type: "done" },
+    ]);
+  });
+
   it("parses streamed events, ignores malformed data, and saves the session", async () => {
     setToken("token");
     const payload = [

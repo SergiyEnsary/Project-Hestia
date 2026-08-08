@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# Block pushes when coverage falls below 80%.
+set -euo pipefail
+
+ROOT="$(git rev-parse --show-toplevel)"
+exec "${ROOT}/scripts/check-coverage.sh"
