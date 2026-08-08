@@ -40,6 +40,7 @@ jobs:
         run: >
           pytest tests/ -v
           --cov=hestia
+          --cov-fail-under=80
           --cov-report=term-missing
           --cov-report=json:coverage/backend.json
           --cov-report=xml:coverage/backend.xml

@@ -1,0 +1,14 @@
+---
+description: Enforce minimum 80% test coverage before push
+alwaysApply: true
+---
+
+# Coverage gate (80%)
+
+Backend and frontend coverage must stay at **80% or higher**.
+
+- Backend: pytest with `--cov=hestia` / `[tool.coverage.report] fail_under = 80`
+- Frontend: Vitest `coverage.thresholds` at 80% for lines, statements, functions, branches
+- Pre-push: `scripts/check-coverage.sh` (installed via `scripts/install-git-hooks.sh`)
+
+Do not lower or bypass these thresholds. If coverage would drop below 80%, add or fix tests before pushing.
