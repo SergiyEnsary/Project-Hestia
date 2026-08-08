@@ -13,6 +13,42 @@ modules:
     enabled: false
     source: ical
     ical_url: ${CALENDAR_ICAL_URL}
+  clio:
+    enabled: false
+    database_path: .hestia/clio.db
+    retention_days: 365
+    max_reminders: 500
+  hephaestus:
+    enabled: false
+    base_url: ${HOME_ASSISTANT_URL}
+    access_token: ${HOME_ASSISTANT_TOKEN}
+    timeout_seconds: 15
+    max_response_bytes: 1000000
+    allow_private_hosts: true
+    allow_insecure_http: false
+    # Exact entity IDs or prefix* patterns
+    entity_allowlist: []
+    # Exact domain.service or domain.* patterns
+    service_allowlist: []
+  hermes:
+    enabled: false
+    host: 127.0.0.1
+    port: 1883
+    use_tls: false
+    username: ${MQTT_USERNAME}
+    password: ${MQTT_PASSWORD}
+    client_id: hestia-hermes
+    topic_allowlist: []
+    timeout_seconds: 10
+    max_payload_bytes: 8192
+  iris:
+    enabled: false
+    provider: ses
+    from_address: ${IRIS_FROM_ADDRESS}
+    recipient_allowlist: []
+    region: us-east-1
+    max_subject_length: 200
+    max_body_length: 4000
 
 interfaces:
   pythia:

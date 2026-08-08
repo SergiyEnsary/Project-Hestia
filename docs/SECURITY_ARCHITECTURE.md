@@ -111,11 +111,12 @@ Every tool declares a `risk_level`:
 - `write`: creates, changes, sends, deletes, unlocks, purchases, or otherwise
   causes a durable side effect.
 
-Write tools MUST NOT be enabled until the orchestrator implements and tests an
-unambiguous, user-visible confirmation tied to the exact arguments and expiring
-after one use. A model statement is not user confirmation. Bulk, destructive,
-financial, security-sensitive, and physical-access actions require a dedicated
-threat review even after generic confirmation exists.
+Write tools MUST NOT execute until an authenticated caller confirms via
+`POST /tools/confirm` with a one-use `confirmation_id` bound to the exact tool
+name and arguments. Confirmations expire. A model statement is not user
+confirmation. Bulk, destructive, financial, security-sensitive, and
+physical-access actions require a dedicated threat review even after generic
+confirmation exists.
 
 Tool failures are isolated and returned as bounded errors. User-facing errors
 MUST NOT include secrets, internal paths, raw upstream bodies, or stack traces.

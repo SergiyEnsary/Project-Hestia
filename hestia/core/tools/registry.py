@@ -7,7 +7,8 @@ from typing import Any
 from jsonschema import Draft202012Validator, FormatChecker
 from jsonschema.exceptions import SchemaError, ValidationError
 
-from hestia.core.tools.models import ToolDefinition, ToolHandler, ToolResult
+from hestia.core.tools.confirmation import WriteConfirmationStore
+from hestia.core.tools.models import RiskLevel, ToolDefinition, ToolHandler, ToolResult
 from hestia.core.tools.policy import ToolExecutionPolicy
 from hestia.modules.base import HestiaModule
 from hestia.security.errors import get_correlation_id
@@ -16,10 +17,19 @@ logger = logging.getLogger(__name__)
 
 
 class ToolRegistry:
-    def __init__(self, policy: ToolExecutionPolicy | None = None) -> None:
+    def __init__(
+        self,
+        policy: ToolExecutionPolicy | None = None,
+        confirmations: WriteConfirmationStore | None = None,
+    ) -> None:
         self._tools: dict[str, ToolDefinition] = {}
         self._handlers: dict[str, ToolHandler] = {}
         self._policy = policy or ToolExecutionPolicy()
+        self._confirmations = confirmations or WriteConfirmationStore()
+
+    @property
+    def confirmations(self) -> WriteConfirmationStore:
+        return self._confirmations
 
     def register_module(self, module: HestiaModule) -> None:
         for tool in module.get_tools():
@@ -38,16 +48,46 @@ class ToolRegistry:
     def get_tool_summary(self) -> str:
         lines = []
         for name, defn in self._tools.items():
-            lines.append(f"- {name}: {defn.description}")
+            risk = f" [{defn.risk_level}]" if defn.risk_level is RiskLevel.WRITE else ""
+            lines.append(f"- {name}{risk}: {defn.description}")
         return "\n".join(lines)
 
-    async def execute(self, name: str, arguments: dict[str, Any]) -> ToolResult:
+    async def execute(
+        self,
+        name: str,
+        arguments: dict[str, Any],
+        *,
+        confirmed: bool = False,
+    ) -> ToolResult:
         if name not in self._handlers:
             return self._error(name, "unknown_tool")
 
         defn = self._tools[name]
-        decision = self._policy.authorize(defn)
+        decision = self._policy.authorize(defn, confirmed=confirmed)
         if not decision.allowed:
+            if decision.error_code == "write_confirmation_required":
+                try:
+                    self._validate_arguments(defn, arguments)
+                except ValidationError:
+                    return self._error(name, "invalid_arguments")
+                pending = self._confirmations.create(name, arguments)
+                payload = {
+                    "status": "confirmation_required",
+                    "confirmation_id": pending.id,
+                    "tool": name,
+                    "arguments": pending.arguments,
+                    "expires_at": pending.expires_at.isoformat(),
+                    "message": (
+                        "This write action requires explicit user confirmation via "
+                        "POST /tools/confirm. Do not treat chat assent as confirmation."
+                    ),
+                }
+                return ToolResult(
+                    name=name,
+                    content=json.dumps(payload),
+                    is_error=True,
+                    error_code="write_confirmation_required",
+                )
             return self._error(
                 name,
                 decision.error_code or "tool_not_authorized",
@@ -66,6 +106,16 @@ class ToolRegistry:
                 "tool_execution_failed",
                 correlation_id=correlation_id,
             )
+
+    async def confirm_and_execute(self, confirmation_id: str) -> ToolResult:
+        pending = self._confirmations.consume(confirmation_id)
+        if pending is None:
+            return self._error("unknown", "invalid_or_expired_confirmation")
+        return await self.execute(
+            pending.tool_name,
+            pending.arguments,
+            confirmed=True,
+        )
 
     def _validate_arguments(self, defn: ToolDefinition, arguments: dict[str, Any]) -> None:
         Draft202012Validator(
@@ -138,6 +188,12 @@ class ToolRegistry:
 
     def format_result(self, result: ToolResult) -> str:
         if result.is_error:
+            if result.error_code == "write_confirmation_required":
+                return (
+                    f"Confirmation required for {result.name}. "
+                    f"Present this payload to the user and wait for POST /tools/confirm: "
+                    f"{result.content}"
+                )
             suffix = f" Reference: {result.correlation_id}." if result.correlation_id else ""
             return f"Error from {result.name} ({result.error_code}): {result.content}{suffix}"
         try:

@@ -25,6 +25,12 @@ echo = [
     "faster-whisper>=1.2.1",
     "piper-tts>=1.5.0",
 ]
+hermes = [
+    "paho-mqtt>=2.1.0",
+]
+iris = [
+    "boto3>=1.34.0",
+]
 dev = [
     "pytest>=9.1.1",
     "pytest-asyncio>=1.4.0",

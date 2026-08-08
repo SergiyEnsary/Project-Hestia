@@ -14,8 +14,13 @@ class PolicyDecision:
 class ToolExecutionPolicy:
     """Central fail-closed authorization policy for tool execution."""
 
-    def authorize(self, definition: ToolDefinition) -> PolicyDecision:
-        if definition.risk_level is RiskLevel.WRITE:
+    def authorize(
+        self,
+        definition: ToolDefinition,
+        *,
+        confirmed: bool = False,
+    ) -> PolicyDecision:
+        if definition.risk_level is RiskLevel.WRITE and not confirmed:
             return PolicyDecision(
                 allowed=False,
                 error_code="write_confirmation_required",

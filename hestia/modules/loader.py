@@ -5,6 +5,10 @@ import logging
 from hestia.config import HestiaConfig, StrictConfig
 from hestia.core.tools.registry import ToolRegistry
 from hestia.modules.base import HestiaModule
+from hestia.modules.clio.module import ClioModule
+from hestia.modules.hephaestus.module import HephaestusModule
+from hestia.modules.hermes.module import HermesModule
+from hestia.modules.iris.module import IrisModule
 from hestia.modules.kairos.module import KairosModule
 from hestia.modules.zephyrus.module import ZephyrusModule
 
@@ -13,6 +17,10 @@ logger = logging.getLogger(__name__)
 MODULE_REGISTRY: dict[str, type[HestiaModule]] = {
     "zephyrus": ZephyrusModule,
     "kairos": KairosModule,
+    "clio": ClioModule,
+    "hephaestus": HephaestusModule,
+    "hermes": HermesModule,
+    "iris": IrisModule,
 }
 
 
@@ -23,6 +31,10 @@ async def load_modules(
     module_configs: dict[str, StrictConfig] = {
         "zephyrus": config.modules.zephyrus,
         "kairos": config.modules.kairos,
+        "clio": config.modules.clio,
+        "hephaestus": config.modules.hephaestus,
+        "hermes": config.modules.hermes,
+        "iris": config.modules.iris,
     }
     if set(MODULE_REGISTRY) != set(module_configs):
         raise RuntimeError("Every registered module must have typed configuration")

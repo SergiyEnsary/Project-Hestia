@@ -17,10 +17,14 @@ Security boundaries and module acceptance rules are defined in
 |------|------|
 | **Hestia** | Core AI, orchestrator, API |
 | **Zephyrus** | Weather |
-| **Kairos** | Calendar (Phase 2) |
+| **Kairos** | Calendar |
 | **Pythia** | Web chat UI |
-| **Echo** | Voice interface (Phase 3) |
+| **Echo** | Voice interface |
 | **Mnemosyne** | Session memory |
+| **Clio** | Reminders and notes |
+| **Hephaestus** | Home Assistant devices |
+| **Hermes** | MQTT messaging |
+| **Iris** | Email notifications (SES) |
 
 ## Quick start
 
@@ -125,6 +129,26 @@ Pass `X-Hestia-Session-ID` with the UUID returned by an earlier response to
 continue that conversation. Audio is processed in memory and is not stored;
 Mnemosyne retains the resulting transcript and assistant reply under its normal
 retention policy.
+
+### Phase 4 modules (disabled by default)
+
+Enable individually under `modules.*` in `config.yaml`. Write actions
+(`clio.create_reminder`, `hephaestus.call_service`, `hermes.publish`,
+`iris.send_email`, …) never run from chat assent alone — they return a
+`confirmation_id`, and the operator must call:
+
+```bash
+curl --request POST http://127.0.0.1:8000/tools/confirm \
+  --header "Authorization: Bearer $HESTIA_API_TOKEN" \
+  --header "Content-Type: application/json" \
+  --data '{"confirmation_id":"..."}'
+```
+
+Optional extras:
+
+```bash
+pip install -e ".[dev,hermes,iris]"
+```
 
 ### Tests
 

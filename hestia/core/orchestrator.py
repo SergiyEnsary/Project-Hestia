@@ -25,6 +25,9 @@ Rules:
 - Never reveal API tokens, environment variables, secrets, or private URLs.
 - Be concise and helpful.
 - If a tool fails, explain what went wrong and suggest alternatives.
+- Write tools require explicit confirmation via POST /tools/confirm. Tell the
+  user the confirmation_id and what will happen; never claim a write succeeded
+  until that endpoint confirms it. Chat replies like "yes" are not confirmation.
 """
 
 

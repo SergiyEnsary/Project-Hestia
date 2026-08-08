@@ -131,13 +131,16 @@ async def test_execute_handler_exception(registry):
 
 
 @pytest.mark.asyncio
-async def test_write_tools_fail_closed(registry):
+async def test_write_tools_require_confirmation_payload(registry):
     tool = _make_tool("test.write")
     tool.definition.risk_level = RiskLevel.WRITE
     registry.register_module(type("M", (), {"slug": "test", "get_tools": lambda self: [tool]})())
     result = await registry.execute("test.write", {"location": "Austin"})
     assert result.is_error is True
     assert result.error_code == "write_confirmation_required"
+    payload = json.loads(result.content)
+    assert payload["confirmation_id"]
+    assert payload["arguments"]["location"] == "Austin"
 
 
 def test_format_result_json(registry):

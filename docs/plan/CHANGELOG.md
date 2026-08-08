@@ -2,6 +2,13 @@
 
 Revision history for [docs/PLAN.md](../PLAN.md). Update this file whenever the plan changes.
 
+## 2026-08-07 — Phase 4 pantheon modules
+
+- Added exact-argument, one-use write confirmation via `POST /tools/confirm`
+- Added Clio (local reminders), Hephaestus (Home Assistant), Hermes (MQTT), Iris (SES)
+- Modules remain disabled by default with allowlists and optional AWS/MQTT extras
+- Deferred: Iris Lambda webhook relay and Pythia confirmation UI
+
 ## 2026-07-18 — Phase 3 Echo backend
 
 - Added the disabled-by-default local Echo speech pipeline

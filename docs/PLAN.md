@@ -1,7 +1,7 @@
 # Hestia: Modular Home Assistant AI
 
-> **Plan status:** Phase 1 implemented  
-> **Last updated:** 2025-06-23  
+> **Plan status:** Phase 4 in progress  
+> **Last updated:** 2026-08-07  
 > **Canonical copy:** This file is the in-repo source of truth for architecture and phasing.  
 > **Revision history:** See [docs/plan/CHANGELOG.md](plan/CHANGELOG.md)
 
@@ -165,8 +165,9 @@ All chat endpoints (`POST /chat`, `POST /chat/stream` using SSE) require a **Bea
 
 - Tools are **explicitly registered** — the LLM cannot execute arbitrary code or shell commands
 - Each tool validates its parameters against a JSON schema before execution
-- Module tools declare a `risk_level`: `read` (default) or `write` (future Hephaestus)
-- `write` tools require a confirmation step before execution (Phase 4)
+- Module tools declare a `risk_level`: `read` (default) or `write`
+- `write` tools require exact-argument, one-use confirmation via `POST /tools/confirm`
+  (chat assent is not confirmation)
 - System prompt instructs Hestia: never reveal API tokens, env vars, or iCal URLs in responses
 
 ## Secrets & Configuration Storage
@@ -233,7 +234,8 @@ Project Hestia/
 
 ### Phase 4 — Expand the pantheon
 - **Hephaestus** (Home Assistant), **Hermes** (MQTT), **Clio** (reminders)
-- **Iris** (notifications — AWS SES free tier, optional Lambda)
+- **Iris** (notifications — AWS SES free tier)
+- Exact-argument write confirmation (`POST /tools/confirm`)
 
 ## Key Design Decisions
 
@@ -272,4 +274,11 @@ Track build progress here. Update as phases complete.
 - [x] Phase 3 — Echo
   - [x] Authenticated, bounded local STT → orchestrator → TTS API
   - [x] Same-origin microphone capture and audio playback client
-- [ ] Phase 4 — Hephaestus, Hermes, Clio
+- [x] Phase 4 — Expand the pantheon
+  - [x] Write confirmation store + `POST /tools/confirm`
+  - [x] Clio reminders (SQLite, disabled by default)
+  - [x] Hephaestus Home Assistant (allowlisted entities/services)
+  - [x] Hermes MQTT publish (allowlisted topics; optional `paho-mqtt`)
+  - [x] Iris SES email (allowlisted recipients; optional `boto3`)
+  - [ ] Optional Iris Lambda webhook relay
+  - [ ] Pythia UI affordance for write confirmation

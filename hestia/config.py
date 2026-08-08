@@ -127,9 +127,101 @@ class KairosConfig(StrictConfig):
         return self
 
 
+class ClioConfig(StrictConfig):
+    enabled: bool = False
+    database_path: Path = Path(".hestia/clio.db")
+    retention_days: int = Field(default=365, ge=1, le=3650)
+    max_reminders: int = Field(default=500, ge=1, le=10_000)
+
+
+class HephaestusConfig(StrictConfig):
+    enabled: bool = False
+    base_url: str = Field(default="", repr=False)
+    access_token: str = Field(default="", repr=False)
+    timeout_seconds: int = Field(default=15, ge=1, le=60)
+    max_response_bytes: int = Field(default=1_000_000, ge=1024, le=5_000_000)
+    allow_private_hosts: bool = True
+    allow_insecure_http: bool = False
+    entity_allowlist: list[str] = Field(default_factory=list)
+    service_allowlist: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_enabled(self) -> HephaestusConfig:
+        if not self.enabled:
+            return self
+        if not self.base_url:
+            raise ValueError("modules.hephaestus.base_url is required when enabled")
+        if not self.access_token:
+            raise ValueError("modules.hephaestus.access_token is required when enabled")
+        if not self.entity_allowlist:
+            raise ValueError("modules.hephaestus.entity_allowlist is required when enabled")
+        if not self.service_allowlist:
+            raise ValueError("modules.hephaestus.service_allowlist is required when enabled")
+        parsed = urlsplit(self.base_url)
+        if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+            raise ValueError("modules.hephaestus.base_url must be an HTTP(S) URL")
+        if parsed.username or parsed.password:
+            raise ValueError("Credentials must not appear in modules.hephaestus.base_url")
+        if parsed.scheme == "http" and not self.allow_insecure_http:
+            raise ValueError(
+                "HTTP Home Assistant URLs require modules.hephaestus.allow_insecure_http=true"
+            )
+        return self
+
+
+class HermesConfig(StrictConfig):
+    enabled: bool = False
+    host: str = Field(default="127.0.0.1", min_length=1, max_length=253)
+    port: int = Field(default=1883, ge=1, le=65535)
+    use_tls: bool = False
+    username: str = Field(default="", repr=False, max_length=200)
+    password: str = Field(default="", repr=False, max_length=500)
+    client_id: str = Field(default="hestia-hermes", min_length=1, max_length=64)
+    topic_allowlist: list[str] = Field(default_factory=list)
+    timeout_seconds: int = Field(default=10, ge=1, le=60)
+    max_payload_bytes: int = Field(default=8_192, ge=1, le=65_536)
+
+    @model_validator(mode="after")
+    def validate_enabled(self) -> HermesConfig:
+        if self.enabled and not self.topic_allowlist:
+            raise ValueError("modules.hermes.topic_allowlist is required when Hermes is enabled")
+        return self
+
+
+class IrisConfig(StrictConfig):
+    enabled: bool = False
+    provider: str = "ses"
+    from_address: str = Field(default="", max_length=320)
+    recipient_allowlist: list[str] = Field(default_factory=list)
+    region: str = Field(default="us-east-1", min_length=1, max_length=32)
+    max_subject_length: int = Field(default=200, ge=1, le=500)
+    max_body_length: int = Field(default=4000, ge=1, le=20_000)
+
+    @field_validator("provider")
+    @classmethod
+    def validate_provider(cls, value: str) -> str:
+        if value != "ses":
+            raise ValueError("Iris currently supports only the 'ses' provider")
+        return value
+
+    @model_validator(mode="after")
+    def validate_enabled(self) -> IrisConfig:
+        if not self.enabled:
+            return self
+        if not self.from_address:
+            raise ValueError("modules.iris.from_address is required when Iris is enabled")
+        if not self.recipient_allowlist:
+            raise ValueError("modules.iris.recipient_allowlist is required when Iris is enabled")
+        return self
+
+
 class ModulesConfig(StrictConfig):
     zephyrus: ZephyrusConfig = Field(default_factory=ZephyrusConfig)
     kairos: KairosConfig = Field(default_factory=KairosConfig)
+    clio: ClioConfig = Field(default_factory=ClioConfig)
+    hephaestus: HephaestusConfig = Field(default_factory=HephaestusConfig)
+    hermes: HermesConfig = Field(default_factory=HermesConfig)
+    iris: IrisConfig = Field(default_factory=IrisConfig)
 
 
 class PythiaConfig(StrictConfig):
@@ -253,6 +345,10 @@ def load_config() -> HestiaConfig:
     if not config.mnemosyne.database_path.is_absolute():
         config.mnemosyne.database_path = (
             config_path.parent / config.mnemosyne.database_path
+        ).resolve()
+    if not config.modules.clio.database_path.is_absolute():
+        config.modules.clio.database_path = (
+            config_path.parent / config.modules.clio.database_path
         ).resolve()
     echo = config.interfaces.echo
     if echo.stt_model_path is not None and not echo.stt_model_path.is_absolute():

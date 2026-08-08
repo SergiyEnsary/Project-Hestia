@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from hestia.api.routes import chat, echo, health
+from hestia.api.routes import chat, echo, health, tools
 from hestia.config import HestiaConfig, load_config
 from hestia.core.llm.ollama import OllamaProvider
 from hestia.core.mnemosyne import Mnemosyne
@@ -108,6 +108,7 @@ def create_app(config: HestiaConfig | None = None) -> FastAPI:
 
     app.include_router(health.router)
     app.include_router(chat.router)
+    app.include_router(tools.router)
     if config.interfaces.echo.enabled:
         app.include_router(echo.router)
 
