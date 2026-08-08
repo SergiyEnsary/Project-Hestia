@@ -2,6 +2,14 @@
 
 Revision history for [docs/PLAN.md](../PLAN.md). Update this file whenever the plan changes.
 
+## 2026-07-18 — Phase 3 Echo backend
+
+- Added the disabled-by-default local Echo speech pipeline
+- Defined bounded authenticated audio upload, transcript, conversation, and WAV response contract
+- Selected local faster-whisper STT and Piper TTS with explicit operator-managed model paths
+- Added Pythia microphone capture and reply playback gated by authenticated Echo readiness
+- Completed the Phase 3 checklist
+
 ## 2025-06-23 — Phase 1 implemented
 
 - Full scaffold: Python package, FastAPI API, security, Zephyrus weather module, Pythia React UI

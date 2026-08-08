@@ -22,6 +22,7 @@ venv/
 .ruff_cache/
 htmlcov/
 .coverage
+coverage/
 
 # Node / Pythia
 node_modules/

@@ -1,10 +1,15 @@
 # Hestia
 
+[![Coverage Status](https://coveralls.io/repos/github/SergiyEnsary/Project-Hestia/badge.svg?branch=main)](https://coveralls.io/github/SergiyEnsary/Project-Hestia?branch=main)
+
 **Hestia** is a local-first home assistant AI. She runs on your home server with [Ollama](https://ollama.com), delegates to Greek-named capability modules, and is consulted through **Pythia** (web chat).
 
 **Repository:** [github.com/SergiyEnsary/Project-Hestia](https://github.com/SergiyEnsary/Project-Hestia)
 
 See the full architecture plan in [docs/PLAN.md](docs/PLAN.md).
+Security boundaries and module acceptance rules are defined in
+[docs/SECURITY_ARCHITECTURE.md](docs/SECURITY_ARCHITECTURE.md) and
+[docs/MODULE_AUTHORING.md](docs/MODULE_AUTHORING.md).
 
 ## Pantheon
 
@@ -23,7 +28,7 @@ See the full architecture plan in [docs/PLAN.md](docs/PLAN.md).
 
 - Python 3.11+
 - **[Ollama](https://ollama.com)** — Hestia's local AI brain (required)
-- Node.js 18+ (for Pythia dev UI)
+- Node.js 22.12+ (for Pythia dev UI)
 
 ### Install Ollama
 
@@ -46,7 +51,7 @@ You should get a JSON response listing models. If this fails, Hestia cannot chat
 ### Setup
 
 ```bash
-cd "/Users/sergiyensary/Desktop/Code/Project Hestia"
+cd "Project Hestia"
 
 # Create and activate the virtual environment (required before hestia works)
 python3 -m venv .venv
@@ -86,32 +91,132 @@ npm run dev    # http://localhost:5173 — proxies API to :8000
 
 Open Pythia, enter your `HESTIA_API_TOKEN` in settings, and chat with Hestia.
 
+### Echo (local voice API)
+
+Echo is disabled by default. It accepts bounded encoded audio, performs local
+speech recognition, sends the transcript through the same authenticated Hestia
+orchestrator, and returns both the reply and local Piper speech as
+base64-encoded WAV audio. When Echo is enabled, Pythia's **Voice** control
+checks backend readiness before requesting same-origin microphone permission,
+then records, submits, and plays the local response.
+
+Install the optional local speech engines:
+
+```bash
+pip install -e ".[dev,echo]"
+```
+
+Download a faster-whisper model directory and a Piper `.onnx` voice plus its
+companion `.onnx.json` file into `.hestia/models/`. Set their paths under
+`interfaces.echo` in `config.yaml`, then set `enabled: true`. Hestia never
+downloads speech models at startup.
+
+The endpoint accepts `audio/wav`, `audio/webm`, `audio/ogg`, `audio/mpeg`, and
+`audio/mp4`:
+
+```bash
+curl --request POST http://127.0.0.1:8000/echo \
+  --header "Authorization: Bearer $HESTIA_API_TOKEN" \
+  --header "Content-Type: audio/wav" \
+  --data-binary @question.wav
+```
+
+Pass `X-Hestia-Session-ID` with the UUID returned by an earlier response to
+continue that conversation. Audio is processed in memory and is not stored;
+Mnemosyne retains the resulting transcript and assistant reply under its normal
+retention policy.
+
 ### Tests
 
 ```bash
 source .venv/bin/activate
-pytest tests/ -v
+pytest tests/ -v --cov=hestia --cov-report=term-missing
+
+cd hestia/interfaces/pythia
+npm run typecheck
+npm run build
+npm run test:coverage
 ```
 
-### Production
+GitHub Actions publishes backend and frontend coverage in the workflow summary
+and attaches the full reports to each run. Coveralls combines both reports for
+the coverage badge at the top of this page.
+
+### Production without Docker
 
 ```bash
 cd hestia/interfaces/pythia && npm run build
 hestia serve   # serves API + built Pythia at http://127.0.0.1:8000
 ```
 
+### Docker Compose
+
+Docker builds Pythia and Hestia into one non-root image. It does not include or
+publish Ollama; run Ollama on the host and keep port 11434 behind the host
+firewall.
+
+Create the runtime files locally:
+
+```bash
+cp config.yaml.example config.yaml
+cp .env.example .env
+openssl rand -hex 32   # replace HESTIA_API_TOKEN in .env
+```
+
+For the container, change these values in the untracked `config.yaml`:
+
+```yaml
+llm:
+  base_url: http://host.docker.internal:11434
+  allow_remote: true
+  allow_insecure_http: true  # only for the private Docker-to-host bridge
+
+mnemosyne:
+  backend: sqlite
+  database_path: /var/lib/hestia/mnemosyne.db
+```
+
+Compose supplies the container-only `0.0.0.0:8000` bind through environment
+overrides while publishing it only on the host's loopback interface.
+
+Then start and inspect the health probe:
+
+```bash
+docker compose up --build -d
+docker compose ps
+curl http://127.0.0.1:8000/health
+```
+
+To build the optional Echo dependencies into the container, use
+`HESTIA_EXTRAS=echo docker compose up --build -d`. Store speech models below
+`/var/lib/hestia/models` in the existing persistent volume and use those paths
+in `config.yaml`. Measure memory and CPU usage before increasing concurrency or
+loosening the supplied container limits.
+
+On Linux, Ollama must accept connections from the Docker bridge; restrict
+11434 with the host firewall and never port-forward it. Hestia itself is
+published on host loopback only. Put an authenticated TLS reverse proxy in
+front if remote access is required.
+
+Compose mounts `config.yaml` and `.env` read-only, persists only
+`/var/lib/hestia`, and runs with a read-only root filesystem, dropped
+capabilities, and CPU/memory/PID limits. Tune the limits in
+`docker-compose.yml` after measuring the workload; do not store secrets in the
+image or Compose environment. See the
+[security architecture](docs/SECURITY_ARCHITECTURE.md) for deployment
+requirements.
+
 ## Security
 
-- All chat endpoints require `Authorization: Bearer <HESTIA_API_TOKEN>`
+- All chat and Echo endpoints require `Authorization: Bearer <HESTIA_API_TOKEN>`
 - Never commit `.env` or `config.yaml`
+- Never expose Hestia or Ollama directly to the public internet
 - See [SECURITY.md](SECURITY.md) for vulnerability reporting
 
 ## Adding a module
 
-1. Pick an unused Greek mythological name
-2. Create `hestia/modules/<slug>/module.py` implementing `HestiaModule`
-3. Register in `config.yaml` under `modules.<slug>`
-4. Add an entry to `hestia/modules/loader.py`
+Follow the enforceable lifecycle, schema, risk, isolation, and test contract in
+[docs/MODULE_AUTHORING.md](docs/MODULE_AUTHORING.md).
 
 ## License
 

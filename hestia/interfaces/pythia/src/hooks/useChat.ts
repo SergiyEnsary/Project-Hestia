@@ -12,6 +12,21 @@ export function useChat() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const assistantBuffer = useRef("");
+  const addExchange = useCallback((transcript: string, reply: string) => {
+    setMessages((previous) => [
+      ...previous,
+      {
+        id: crypto.randomUUID(),
+        role: "user",
+        content: transcript,
+      },
+      {
+        id: crypto.randomUUID(),
+        role: "assistant",
+        content: reply,
+      },
+    ]);
+  }, []);
 
   const sendMessage = useCallback(async (text: string) => {
     if (!text.trim() || loading) return;
@@ -66,5 +81,5 @@ export function useChat() {
     }
   }, [loading]);
 
-  return { messages, loading, error, sendMessage, setError };
+  return { messages, loading, error, sendMessage, addExchange, setError };
 }

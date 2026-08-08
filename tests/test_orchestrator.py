@@ -1,14 +1,14 @@
 import json
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock
 
 import pytest
 
+from hestia.config import HestiaConfig
+from hestia.core.llm.errors import OllamaUnavailableError
 from hestia.core.mnemosyne import Mnemosyne
 from hestia.core.orchestrator import Orchestrator
 from hestia.core.tools.models import ChatMessage, ToolCall
 from hestia.core.tools.registry import ToolRegistry
-from hestia.config import HestiaConfig
-from hestia.core.llm.errors import OllamaUnavailableError
 
 
 @pytest.fixture
@@ -53,10 +53,16 @@ async def test_orchestrator_tool_loop(config, mock_llm):
     tool_def = ToolDefinition(
         name="zephyrus.get_current_weather",
         description="Get weather",
-        parameters={"type": "object", "properties": {"location": {"type": "string"}}},
+        parameters={
+            "type": "object",
+            "properties": {"location": {"type": "string", "maxLength": 200}},
+            "additionalProperties": False,
+        },
     )
 
     class FakeModule:
+        slug = "zephyrus"
+
         def get_tools(self):
             from hestia.modules.base import RegisteredTool
 
@@ -69,7 +75,9 @@ async def test_orchestrator_tool_loop(config, mock_llm):
             ChatMessage(
                 role="assistant",
                 content="",
-                tool_calls=[ToolCall(name="zephyrus.get_current_weather", arguments={"location": "London"})],
+                tool_calls=[
+                    ToolCall(name="zephyrus.get_current_weather", arguments={"location": "London"})
+                ],
             ),
             ChatMessage(role="assistant", content="It is 22°C in London."),
         ]
@@ -85,9 +93,7 @@ async def test_orchestrator_tool_loop(config, mock_llm):
 
 @pytest.mark.asyncio
 async def test_orchestrator_ollama_unavailable(config, registry, mock_llm):
-    mock_llm.chat = AsyncMock(
-        side_effect=OllamaUnavailableError("http://127.0.0.1:11434")
-    )
+    mock_llm.chat = AsyncMock(side_effect=OllamaUnavailableError("http://127.0.0.1:11434"))
     memory = Mnemosyne()
     orchestrator = Orchestrator(config, mock_llm, registry, memory)
 
@@ -110,11 +116,15 @@ async def test_orchestrator_max_tool_iterations(config, mock_llm):
         definition=ToolDefinition(
             name="loop.tool",
             description="loops",
-            parameters={"type": "object", "properties": {}},
+            parameters={
+                "type": "object",
+                "properties": {},
+                "additionalProperties": False,
+            },
         ),
         handler=handler,
     )
-    registry.register_module(type("M", (), {"get_tools": lambda self: [tool]})())
+    registry.register_module(type("M", (), {"slug": "loop", "get_tools": lambda self: [tool]})())
 
     mock_llm.chat = AsyncMock(
         return_value=ChatMessage(
