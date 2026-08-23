@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=83.0.0", "wheel"]
+requires = ["setuptools>=84.0.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -9,12 +9,12 @@ description = "Local-first home assistant AI with modular Greek-named capabiliti
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "fastapi>=0.139.2",
-    "uvicorn[standard]>=0.51.0",
+    "fastapi>=0.141.1",
+    "uvicorn[standard]>=0.52.4",
     "httpx>=0.28.1",
     "pydantic>=2.13.4",
-    "pydantic-settings>=2.14.2",
-    "python-dotenv>=1.2.2",
+    "pydantic-settings>=2.15.0",
+    "python-dotenv>=1.2.3",
     "pyyaml>=6.0.3",
     "jsonschema",
     "icalendar",
@@ -23,7 +23,7 @@ dependencies = [
 [project.optional-dependencies]
 echo = [
     "faster-whisper>=1.2.1",
-    "piper-tts>=1.5.0",
+    "piper-tts>=1.7.0",
 ]
 dev = [
     "pytest>=9.1.1",
